@@ -1,0 +1,2 @@
+# AsesmenAwalNKRI
+Mempertahankan Keutuhan NKRI
