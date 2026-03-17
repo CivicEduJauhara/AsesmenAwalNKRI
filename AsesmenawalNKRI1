@@ -1,0 +1,709 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agen Nusantara: Versus Mode</title>
+    <style>
+        :root {
+            --bg-color: #12121a;
+            --card-bg: #222230;
+            
+            /* Team Alpha Colors */
+            --alpha-main: #0984e3;
+            --alpha-dark: #00569b;
+            --alpha-glow: rgba(9, 132, 227, 0.4);
+            
+            /* Team Bravo Colors */
+            --bravo-main: #d63031;
+            --bravo-dark: #a01a1a;
+            --bravo-glow: rgba(214, 48, 49, 0.4);
+            
+            --text-main: #f8f9fa;
+            --text-muted: #adb5bd;
+            --correct: #00b894;
+            --incorrect: #d63031;
+            --input-bg: #323246;
+            
+            /* Dynamic active color */
+            --active-color: var(--alpha-main);
+            --active-dark: var(--alpha-dark);
+            --active-glow: var(--alpha-glow);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* VS Scoreboard */
+        .scoreboard-container {
+            width: 100%;
+            max-width: 900px;
+            display: flex;
+            justify-content: space-between;
+            align-items: stretch;
+            background-color: #1a1a24;
+            border-bottom: 2px solid #333;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            z-index: 5;
+            position: sticky;
+            top: 0;
+        }
+
+        .team-score {
+            flex: 1;
+            padding: 15px 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+        }
+
+        .team-score.alpha {
+            border-bottom: 5px solid var(--alpha-main);
+        }
+        
+        .team-score.bravo {
+            border-bottom: 5px solid var(--bravo-main);
+        }
+
+        .team-score.active-turn {
+            background-color: rgba(255,255,255,0.05);
+        }
+
+        .team-name {
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            font-weight: bold;
+            color: var(--text-muted);
+            margin-bottom: 5px;
+        }
+        
+        .alpha .team-name { color: #74b9ff; }
+        .bravo .team-name { color: #ff7675; }
+
+        .score-number {
+            font-size: 2.5rem;
+            font-weight: 900;
+            transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        .score-number.pop {
+            transform: scale(1.5);
+            color: #fdcb6e;
+        }
+
+        .vs-badge {
+            background: linear-gradient(135deg, var(--alpha-main) 50%, var(--bravo-main) 50%);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0 20px;
+            font-weight: 900;
+            font-size: 1.5rem;
+            font-style: italic;
+            box-shadow: inset 0 0 10px rgba(0,0,0,0.5);
+        }
+
+        /* Main Container */
+        .container {
+            width: 100%;
+            max-width: 800px;
+            background-color: var(--card-bg);
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.6);
+            margin: 30px 20px;
+            overflow: hidden;
+            position: relative;
+            border: 2px solid transparent;
+            transition: border-color 0.5s ease, box-shadow 0.5s ease;
+        }
+
+        .container.glow-alpha {
+            border-color: var(--alpha-main);
+            box-shadow: 0 0 30px var(--alpha-glow);
+        }
+
+        .container.glow-bravo {
+            border-color: var(--bravo-main);
+            box-shadow: 0 0 30px var(--bravo-glow);
+        }
+
+        /* Screens */
+        .screen {
+            display: none;
+            padding: 40px;
+            animation: fadeIn 0.4s ease;
+        }
+        .screen.active { display: block; }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Welcome & Shared UI */
+        .text-center { text-align: center; }
+        .title { font-size: 2rem; margin-bottom: 15px; color: #fff; }
+        .desc { font-size: 1.1rem; color: var(--text-muted); line-height: 1.6; margin-bottom: 30px; text-align: justify; }
+
+        .btn {
+            background-color: var(--active-color);
+            color: #fff;
+            border: none;
+            padding: 15px 30px;
+            font-size: 1.1rem;
+            font-weight: bold;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            width: 100%;
+            box-shadow: 0 4px 15px var(--active-glow);
+        }
+
+        .btn:hover { background-color: var(--active-dark); transform: translateY(-2px); }
+
+        /* Turn Announcer Overlay */
+        .turn-announcer {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background-color: var(--card-bg);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 10;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.4s ease;
+        }
+        .turn-announcer.show { opacity: 1; pointer-events: auto; }
+        .turn-icon { font-size: 4rem; margin-bottom: 20px; }
+        .turn-title { font-size: 2.5rem; font-weight: 900; margin-bottom: 10px; text-transform: uppercase; }
+
+        /* Quiz UI */
+        .mission-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        
+        .mission-badge {
+            background-color: var(--active-glow);
+            color: var(--active-color);
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-weight: bold;
+            border: 1px solid var(--active-color);
+        }
+
+        .round-info { color: var(--text-muted); font-weight: bold; }
+
+        .question-text {
+            font-size: 1.15rem;
+            line-height: 1.6;
+            margin-bottom: 25px;
+            background-color: rgba(0,0,0,0.25);
+            padding: 20px;
+            border-left: 4px solid var(--active-color);
+            border-radius: 6px;
+            text-align: justify;
+        }
+        .question-text p { margin-bottom: 10px; }
+
+        .input-area { display: flex; flex-direction: column; gap: 12px; }
+
+        /* Multiple Choice */
+        .option-btn {
+            background-color: var(--input-bg);
+            color: var(--text-main);
+            border: 2px solid transparent;
+            padding: 15px;
+            border-radius: 10px;
+            font-size: 1.05rem;
+            text-align: left;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            line-height: 1.4;
+            transition: all 0.2s;
+        }
+        .option-btn:hover { background-color: #4b4b5c; border-color: var(--active-color); }
+        .option-letter {
+            background-color: var(--active-dark);
+            color: white;
+            width: 35px; height: 35px;
+            display: flex; justify-content: center; align-items: center;
+            border-radius: 50%;
+            font-weight: bold;
+            flex-shrink: 0;
+        }
+
+        /* Short Answer */
+        .short-answer-input {
+            width: 100%; padding: 18px; font-size: 1.2rem;
+            border-radius: 8px; border: 2px solid #555;
+            background-color: var(--input-bg); color: white;
+            outline: none; transition: border-color 0.3s;
+        }
+        .short-answer-input:focus { border-color: var(--active-color); }
+
+        /* Ordering */
+        .order-item {
+            display: flex; justify-content: space-between; align-items: center;
+            background-color: var(--input-bg); padding: 15px 20px;
+            border-radius: 8px; margin-bottom: 8px; font-size: 1.05rem;
+        }
+        .order-controls { display: flex; gap: 8px; }
+        .order-btn {
+            background-color: var(--active-dark); color: white; border: none;
+            width: 40px; height: 40px; border-radius: 6px; cursor: pointer;
+            font-size: 1.2rem;
+        }
+        .order-btn:hover { background-color: var(--active-color); }
+        .order-btn:disabled { background-color: #444; cursor: not-allowed; }
+
+        /* Feedback Overlay */
+        .feedback-overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background-color: rgba(0,0,0,0.9);
+            display: flex; justify-content: center; align-items: center;
+            z-index: 20; opacity: 0; pointer-events: none; transition: opacity 0.3s ease;
+        }
+        .feedback-overlay.show { opacity: 1; pointer-events: auto; }
+        .feedback-card {
+            background-color: var(--card-bg); width: 90%; max-width: 600px;
+            padding: 30px; border-radius: 12px; text-align: center;
+            border-top: 5px solid var(--active-color);
+            max-height: 85vh; overflow-y: auto;
+        }
+        .feedback-title { font-size: 1.8rem; font-weight: bold; margin-bottom: 15px; }
+        .feedback-text { color: var(--text-muted); line-height: 1.6; font-size: 1.1rem; text-align: justify; margin-bottom: 25px; }
+
+        /* Final Results */
+        .winner-title { font-size: 3rem; margin: 20px 0; font-weight: 900; text-transform: uppercase; }
+        .winner-trophy { font-size: 6rem; animation: float 2s infinite ease-in-out; }
+        
+        @keyframes float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-15px); }
+        }
+
+        .final-scores { display: flex; justify-content: center; gap: 40px; margin-bottom: 30px; }
+        .fs-box { padding: 20px; border-radius: 10px; min-width: 150px; background: rgba(0,0,0,0.3); }
+        .fs-box.alpha { border: 2px solid var(--alpha-main); }
+        .fs-box.bravo { border: 2px solid var(--bravo-main); }
+        .fs-label { color: #aaa; margin-bottom: 5px; font-weight: bold; }
+        .fs-score { font-size: 2.5rem; font-weight: bold; color: white; }
+
+        @media (max-width: 600px) {
+            .screen { padding: 20px; }
+            .score-number { font-size: 2rem; }
+            .team-name { font-size: 0.8rem; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Scoreboard Header -->
+    <div class="scoreboard-container" id="scoreboard">
+        <div class="team-score alpha" id="scoreBox0">
+            <div class="team-name">TIM ALPHA</div>
+            <div class="score-number" id="scoreText0">0</div>
+        </div>
+        <div class="vs-badge">VS</div>
+        <div class="team-score bravo" id="scoreBox1">
+            <div class="team-name">TIM BRAVO</div>
+            <div class="score-number" id="scoreText1">0</div>
+        </div>
+    </div>
+
+    <!-- Main Game Area -->
+    <div class="container" id="mainContainer">
+        
+        <!-- Screen 1: Welcome -->
+        <div class="screen active" id="welcomeScreen">
+            <div class="text-center">
+                <div style="font-size: 4rem; margin-bottom: 10px;">🕵️‍♂️⚔️🕵️‍♀️</div>
+                <h1 class="title">MISI AGEN NUSANTARA<br><span style="color: #fdcb6e; font-size: 1.5rem;">VERSUS MODE</span></h1>
+                <p class="desc">
+                    Kompetisi Intelijen tingkat tinggi dimulai! <b>Tim Alpha</b> dan <b>Tim Bravo</b> akan beradu analisis ketatanegaraan secara bergiliran. Terdapat 16 berkas rahasia bergaya Cambridge (Pilihan Ganda, Isian Singkat, & Urutan Logika).<br><br>
+                    Setiap jawaban benar bernilai <b>10 Poin</b>. Siapkan mental Anda, jawaban yang dikunci tidak bisa diubah kembali!
+                </p>
+                <button class="btn" style="background-color: #27ae60; box-shadow: 0 4px 15px rgba(39, 174, 96, 0.4);" onclick="startMatch()">Mulai Pertandingan 🔥</button>
+            </div>
+        </div>
+
+        <!-- Screen 2: Turn Announcer -->
+        <div class="turn-announcer" id="turnAnnouncer">
+            <div class="turn-icon" id="turnIcon">🔵</div>
+            <div class="turn-title" id="turnTitleText" style="color: var(--alpha-main);">GILIRAN TIM ALPHA</div>
+            <p style="color: var(--text-muted); margin-bottom: 25px; font-size: 1.1rem;">Berikan perangkat ke perwakilan tim. Dilarang menyontek!</p>
+            <button class="btn" style="width: auto; padding: 15px 40px;" onclick="openBerkas()">Buka Berkas Misi 🔓</button>
+        </div>
+
+        <!-- Screen 3: Quiz -->
+        <div class="screen" id="quizScreen">
+            <div class="mission-header">
+                <div class="mission-badge">BERKAS #<span id="badgeNumber">1</span> - <span id="questionTypeLabel">Pilihan Ganda</span></div>
+                <div class="round-info">Ronde <span id="roundCounter">1</span>/8</div>
+            </div>
+            <div class="question-text" id="questionText"></div>
+            <div class="input-area" id="inputArea"></div>
+            <button class="btn" id="submitBtn" style="display: none; margin-top: 25px;" onclick="submitAnswer()">Kunci Jawaban 🔒</button>
+        </div>
+
+        <!-- Screen 4: Results -->
+        <div class="screen" id="resultScreen">
+            <div class="text-center">
+                <div class="winner-trophy" id="winnerTrophy">🏆</div>
+                <div class="title" style="color: #fdcb6e;">OPERASI SELESAI</div>
+                <div class="winner-title" id="winnerText">TIM ALPHA MENANG!</div>
+                
+                <div class="final-scores">
+                    <div class="fs-box alpha">
+                        <div class="fs-label">TIM ALPHA</div>
+                        <div class="fs-score" id="fsAlpha">0</div>
+                    </div>
+                    <div class="fs-box bravo">
+                        <div class="fs-label">TIM BRAVO</div>
+                        <div class="fs-score" id="fsBravo">0</div>
+                    </div>
+                </div>
+                
+                <p id="winnerDesc" style="color: var(--text-muted); margin-bottom: 30px; font-size: 1.1rem;">Kedua tim telah menunjukkan analisis luar biasa, namun hanya ada satu badan intelijen terbaik.</p>
+                <button class="btn" style="background-color: #555; box-shadow: none;" onclick="location.reload()">Main Lagi 🔄</button>
+            </div>
+        </div>
+
+        <!-- Feedback Overlay -->
+        <div class="feedback-overlay" id="feedbackOverlay">
+            <div class="feedback-card">
+                <div style="font-size: 4rem; margin-bottom: 10px;" id="feedbackIcon">✅</div>
+                <div class="feedback-title" id="feedbackTitle">Analisis Tepat!</div>
+                <div class="feedback-text" id="feedbackText">Penjelasan muncul di sini.</div>
+                <button class="btn" onclick="nextTurn()">Lanjutkan Pertandingan ⏭️</button>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // Database 16 Soal (8 per tim)
+        const questions = [
+            // Q1
+            { type: "multiple_choice", label: "Analisis Yurisdiksi", text: "<p><b>Sengketa Yurisdiksi 'Gita Buana'</b></p><p>Gubernur provinsi fiktif 'Gita Buana' secara diam-diam menandatangani pakta kerja sama pertahanan dengan negara tetangga karena merasa kurang diperhatikan pusat.</p><p>Sebagai analis, bagaimana Anda mengevaluasi tindakan gubernur tersebut berdasarkan sistem NKRI?</p>", options: [ { text: "Melanggar konstitusi; urusan luar negeri dan pertahanan adalah kewenangan absolut pemerintah pusat.", isCorrect: true }, { text: "Dibenarkan secara hukum asalkan tujuannya murni untuk meningkatkan stabilitas ekonomi di daerah tersebut.", isCorrect: false }, { text: "Sah-sah saja dilakukan selama gubernur telah mendapat persetujuan tertulis dari DPRD tingkat provinsi.", isCorrect: false }, { text: "Inovasi otonomi daerah di era globalisasi modern yang seharusnya didukung penuh oleh pemerintah pusat.", isCorrect: false } ], explanation: "Urusan absolut (Luar Negeri, Pertahanan, Keamanan, Yustisi, Moneter, Agama) berada di tangan Pemerintah Pusat." },
+            // Q2
+            { type: "ordering", label: "Hierarki Hukum", text: "<p><b>Hierarki Peraturan</b></p><p>Untuk mencegah tumpang tindih peraturan, urutkan sumber hukum berikut dari posisi <b>paling tinggi ke paling rendah</b> (UU No. 12 Tahun 2011)!</p>", items: ["Peraturan Presiden (Perpres)", "Ketetapan MPR (Tap MPR)", "Peraturan Pemerintah (PP)", "UUD NRI Tahun 1945", "Undang-Undang (UU) / Perppu"], correctOrder: ["UUD NRI Tahun 1945", "Ketetapan MPR (Tap MPR)", "Undang-Undang (UU) / Perppu", "Peraturan Pemerintah (PP)", "Peraturan Presiden (Perpres)"], explanation: "Urutan mutlak: UUD 1945 -> Tap MPR -> UU/Perppu -> PP -> Perpres." },
+            // Q3
+            { type: "short_answer", label: "Sandi Ideologi", text: "<p><b>Penetrasi Ideologi Asing</b></p><p>Paham ekstrem ini mengajarkan kebebasan individu mutlak, kapitalisme tak terkendali, dan mengabaikan keadilan sosial masyarakat.</p><p>Sebutkan <b>satu kata</b> nama paham yang bertentangan dengan Sila ke-2 dan ke-5 tersebut!</p>", acceptableAnswers: ["liberalisme", "liberal", "kapitalisme"], explanation: "Liberalisme sangat menekankan individualisme, yang merusak semangat gotong royong Pancasila." },
+            // Q4
+            { type: "multiple_choice", label: "Keamanan Siber", text: "<p><b>Serangan Ransomware Infrastruktur</b></p><p>Pusat Data Nasional lumpuh oleh <i>ransomware</i> yang menyusup lewat celah kelalaian oknum internal yang kurang literasi digital.</p><p>Dalam ketahanan nasional, fenomena ini diklasifikasikan sebagai ancaman apa?</p>", options: [ { text: "Ancaman militer akibat kegagalan alutsista pertahanan di wilayah perbatasan laut dan udara NKRI.", isCorrect: false }, { text: "Ancaman nirmiliter berdimensi teknologi yang kerentanannya bersumber dari kelemahan kapasitas SDM.", isCorrect: true }, { text: "Tantangan ekonomi global akibat konspirasi multinasional demi melemahkan nilai tukar mata uang.", isCorrect: false }, { text: "Gangguan ideologi yang dirancang kelompok radikal untuk mengganti dasar negara menjadi komunis.", isCorrect: false } ], explanation: "Serangan siber adalah ancaman nirmiliter. Kelemahan SDM sering menjadi pintu masuk utama." },
+            // Q5
+            { type: "short_answer", label: "Sistem Eksekutif", text: "<p><b>Struktur Pemerintahan</b></p><p>Di Indonesia, Presiden mengemban dua peran sekaligus, berbeda dengan negara yang memisahkan Perdana Menteri dan Raja.</p><p>Sistem pemerintahan apakah yang menempatkan Presiden sebagai Kepala Negara sekaligus Kepala Pemerintahan?</p>", acceptableAnswers: ["presidensial", "presidensiil"], explanation: "Dalam sistem Presidensial, kekuasaan eksekutif terpusat pada Presiden." },
+            // Q6
+            { type: "ordering", label: "Protokol Digital", text: "<p><b>Protokol Anti-Hoax</b></p><p>Anda menemukan video provokatif berbau SARA yang viral. Urutkan langkah <i>Bela Negara Digital</i> berikut secara logis!</p>", items: ["Melaporkan (report) konten tersebut ke platform.", "Tidak buru-buru membagikan video ke grup lain.", "Mencari klarifikasi berita dari sumber resmi.", "Edukasi di kolom komentar dengan menyertakan fakta."], correctOrder: ["Tidak buru-buru membagikan video ke grup lain.", "Mencari klarifikasi berita dari sumber resmi.", "Melaporkan (report) konten tersebut ke platform.", "Edukasi di kolom komentar dengan menyertakan fakta."], explanation: "Tahan diri (jangan share) -> Cek Fakta -> Report -> Edukasi." },
+            // Q7
+            { type: "multiple_choice", label: "Analisis Korupsi", text: "<p><b>Korupsi Bansos</b></p><p>Kepala daerah menyalahgunakan bansos untuk kampanye, menyebabkan kemiskinan struktural. Korupsi ini adalah ancaman langsung terhadap nilai Pancasila, khususnya...</p>", options: [ { text: "Sila Pertama, karena korupsi menunjukkan pelaku tidak mengakui adanya tuhan dalam kehidupan bernegara.", isCorrect: false }, { text: "Sila Ketiga, karena korupsi menyebabkan terputusnya jalur komunikasi di antara masyarakat suku daerah.", isCorrect: false }, { text: "Sila Kelima, karena korupsi merampas hak ekonomi masyarakat rentan dan menghancurkan prinsip keadilan.", isCorrect: true }, { text: "Sila Keempat, karena korupsi membuktikan sistem pemilihan umum tidak cocok diterapkan di negara ini.", isCorrect: false } ], explanation: "Korupsi bansos merampas hak orang miskin, pelanggaran fatal Sila ke-5 (Keadilan Sosial)." },
+            // Q8
+            { type: "short_answer", label: "Geopolitik", text: "<p><b>Sengketa Maritim</b></p><p>Masyarakat sadar laut bukan pemisah pulau, tapi penghubung. Sebutkan istilah (2 kata) cara pandang bangsa Indonesia mengenai bentuk geografinya sebagai satu kesatuan!</p>", acceptableAnswers: ["wawasan nusantara", "wawasan nasional"], explanation: "Wawasan Nusantara memandang Indonesia sebagai satu kesatuan politik, ekonomi, sosial, dan Hankam." },
+            // Q9
+            { type: "multiple_choice", label: "Demokrasi", text: "<p><b>Demokrasi Transaksional</b></p><p>Banyak pemilih muda yang pragmatis dan hanya memilih kandidat yang memberi 'serangan fajar'. Konsekuensi paling logis dan merusak dari fenomena ini adalah...</p>", options: [ { text: "Melahirkan pemimpin otonom yang berani menentang kebijakan investasi dari perusahaan multinasional.", isCorrect: false }, { text: "Menciptakan sistem pemerintahan monarki di mana kekuasaan hanya diwariskan berdasarkan keturunan.", isCorrect: false }, { text: "Mengubah bentuk negara kesatuan menjadi serikat karena daerah menuntut mencetak mata uang sendiri.", isCorrect: false }, { text: "Melahirkan kebijakan publik korup yang hanya melayani kepentingan pemodal yang mendanai kampanye.", isCorrect: true } ], explanation: "Politik uang melahirkan 'oligarki' dimana pemimpin bekerja untuk donatur kampanyenya, bukan rakyat." },
+            // Q10
+            { type: "ordering", label: "Sejarah Ketatanegaraan", text: "<p><b>Dinamika Bentuk Negara</b></p><p>Urutkan peristiwa perubahan bentuk negara Indonesia ini dari yang <b>paling awal (1945) ke paling akhir</b>!</p>", items: ["Bentuk negara diubah kembali menjadi Negara Kesatuan (NKRI).", "Indonesia dipaksa menjadi Republik Indonesia Serikat (RIS) akibat KMB.", "Deklarasi Kemerdekaan dengan bentuk awal Negara Kesatuan.", "Amandemen UUD 1945 yang memperkuat otonomi daerah."], correctOrder: ["Deklarasi Kemerdekaan dengan bentuk awal Negara Kesatuan.", "Indonesia dipaksa menjadi Republik Indonesia Serikat (RIS) akibat KMB.", "Bentuk negara diubah kembali menjadi Negara Kesatuan (NKRI).", "Amandemen UUD 1945 yang memperkuat otonomi daerah."], explanation: "Kemerdekaan (Kesatuan) -> RIS 1949 -> Kembali NKRI 1950 -> Amandemen Otonomi 1999." },
+            // Q11
+            { type: "multiple_choice", label: "Ancaman Sosial", text: "<p><b>Hedonisme dan Pinjol</b></p><p>Remaja terjerat pinjol ilegal demi membeli barang branded agar diakui di medsos. Berdasarkan wawasan kebangsaan, apa solusinya?</p>", options: [ { text: "Menutup seluruh akses internet dan media sosial secara total dari wilayah yurisdiksi Republik Indonesia.", isCorrect: false }, { text: "Penguatan filter budaya nasional yang menekankan sikap bersahaja, hidup hemat, dan peduli sesama.", isCorrect: true }, { text: "Pemerintah mencetak uang sebanyak-banyaknya agar seluruh masyarakat mampu berbelanja barang mewah.", isCorrect: false }, { text: "Menghapus mata pelajaran PPKn agar siswa tidak tertekan dan bebas mengekspresikan jati diri asingnya.", isCorrect: false } ], explanation: "Gaya hidup hedonisme (Sila ke-5) harus dilawan dengan penguatan karakter bersahaja dan nilai luhur bangsa." },
+            // Q12
+            { type: "short_answer", label: "Sandi Kebangsaan", text: "<p><b>Diskriminasi Pekerja</b></p><p>Perusahaan menolak pelamar beda agama. Ini melanggar semboyan negara kita. Tuliskan <b>tiga kata</b> semboyan tersebut!</p>", acceptableAnswers: ["bhinneka tunggal ika", "bhineka tunggal ika"], explanation: "Bhinneka Tunggal Ika (Berbeda-beda tetapi satu). Diskriminasi adalah musuh utama semboyan ini." },
+            // Q13
+            { type: "multiple_choice", label: "Kebijakan Daerah", text: "<p><b>Propaganda Separatis</b></p><p>Separatis menyebar narasi bahwa pemerintah pusat merampok kekayaan alam mereka. Argumen konseptual paling akurat untuk mematahkan narasi ini adalah...</p>", options: [ { text: "Pusat tidak butuh kekayaan tersebut sehingga daerah bebas menjualnya secara mandiri ke luar negeri.", isCorrect: false }, { text: "Kebijakan Otonomi Khusus menjamin daerah mengelola mayoritas pendapatan alamnya untuk pembangunan lokal.", isCorrect: true }, { text: "Sistem republik memungkinkan kelompok bersenjata langsung diangkat menjadi menteri kabinet tanpa pemilu.", isCorrect: false }, { text: "Bentuk negara serikat mewajibkan tiap pulau punya angkatan laut sendiri untuk melindungi aset tambang.", isCorrect: false } ], explanation: "Lewat Otonomi Khusus (Otsus), pemerintah pusat mengembalikan porsi dana bagi hasil yang jauh lebih besar ke daerah." },
+            // Q14
+            { type: "ordering", label: "Resolusi Konflik", text: "<p><b>Konflik Sosial Online</b></p><p>Dua kubu di Discord saling ancam (doxing) karena beda pilihan politik. Urutkan respons penyelesaian konflik dari awal hingga tahap akhir!</p>", items: ["Lapor polisi jika ancaman sudah melibatkan penyebaran alamat rumah.", "Jadi mediator netral dan mendinginkan suasana perdebatan.", "Identifikasi pokok permasalahan secara objektif.", "Ajak mereka keluar topik politik dan main game kembali."], correctOrder: ["Identifikasi pokok permasalahan secara objektif.", "Jadi mediator netral dan mendinginkan suasana perdebatan.", "Ajak mereka keluar topik politik dan main game kembali.", "Lapor polisi jika ancaman sudah melibatkan penyebaran alamat rumah."], explanation: "Pahami masalah -> Mediasi -> Distraksi/Cairkan suasana -> Eskalasi ke Polisi jika mengancam nyawa." },
+            // Q15
+            { type: "multiple_choice", label: "Supremasi Hukum", text: "<p><b>Main Hakim Sendiri</b></p><p>Warga menangkap pencuri dan memukulinya beramai-ramai lalu disiarkan live. Implikasi fatal tindakan ini bagi negara adalah...</p>", options: [ { text: "Sangat efektif memberi efek jera instan sehingga polisi tidak perlu mengurus kasus kriminal kecil lagi.", isCorrect: false }, { text: "Tindakan sah berbasis kearifan lokal karena pelaku menodai keamanan lingkungan tempat tinggal warga.", isCorrect: false }, { text: "Meruntuhkan prinsip 'Negara Hukum' dengan mengambil alih fungsi peradilan dan melanggar asas praduga tak bersalah.", isCorrect: true }, { text: "Implementasi sempurna dari kebebasan berekspresi karena disiarkan live agar dinilai transparansinya.", isCorrect: false } ], explanation: "Indonesia adalah negara hukum (Pasal 1 ayat 3). Main hakim sendiri (vigilante) merusak sistem peradilan." },
+            // Q16 (New)
+            { type: "multiple_choice", label: "Hak dan Kewajiban", text: "<p><b>Sengketa Pajak dan Fasilitas Publik</b></p><p>Sekelompok pengusaha elit menuntut pemerintah segera membangun infrastruktur jalan tol gratis di kawasan industri mereka. Namun, investigasi PPATK menemukan kelompok tersebut secara sistematis memanipulasi laporan keuangan untuk menghindari pajak (tax evasion).</p><p>Dalam tinjauan Konstitusi UUD 1945, bagaimana seharusnya negara merespons fenomena ini?</p>", options: [ { text: "Pemerintah wajib memenuhi tuntutan jalan tol tersebut terlebih dahulu sebagai bukti pelayanan prima kepada sektor swasta penopang ekonomi.", isCorrect: false }, { text: "Tindakan pengusaha tersebut adalah pelanggaran berat karena pemenuhan hak warga negara tidak dapat dipisahkan dari pelaksanaan kewajibannya.", isCorrect: true }, { text: "Menghindari pajak adalah hak asasi di bidang ekonomi sehingga negara tidak boleh mencampuri urusan pelaporan keuangan internal perusahaan swasta.", isCorrect: false }, { text: "Negara harus mengubah sistem ekonomi menjadi sosialis penuh agar tidak ada lagi tuntutan fasilitas dari pihak swasta yang membebani APBN.", isCorrect: false } ], explanation: "Dalam UUD 1945, Hak dan Kewajiban ibarat dua sisi koin. Menuntut hak (fasilitas) tapi mengkhianati kewajiban (membayar pajak) adalah pelanggaran terhadap kewajiban dasar warga negara." }
+        ];
+
+        // Game State
+        let scores = [0, 0]; // Index 0: Alpha, Index 1: Bravo
+        let currentTeam = 0; // 0 = Alpha, 1 = Bravo
+        let currentQuestionIndex = 0;
+        let currentRound = 1;
+        let currentOrderData = []; 
+
+        // Elements
+        const root = document.documentElement;
+        const mainContainer = document.getElementById('mainContainer');
+        const scoreTexts = [document.getElementById('scoreText0'), document.getElementById('scoreText1')];
+        const scoreBoxes = [document.getElementById('scoreBox0'), document.getElementById('scoreBox1')];
+        
+        const turnAnnouncer = document.getElementById('turnAnnouncer');
+        const turnIcon = document.getElementById('turnIcon');
+        const turnTitleText = document.getElementById('turnTitleText');
+        
+        const screens = document.querySelectorAll('.screen');
+        const badgeNumber = document.getElementById('badgeNumber');
+        const roundCounter = document.getElementById('roundCounter');
+        const questionTypeLabel = document.getElementById('questionTypeLabel');
+        const questionText = document.getElementById('questionText');
+        const inputArea = document.getElementById('inputArea');
+        const submitBtn = document.getElementById('submitBtn');
+        
+        const feedbackOverlay = document.getElementById('feedbackOverlay');
+        const feedbackIcon = document.getElementById('feedbackIcon');
+        const feedbackTitle = document.getElementById('feedbackTitle');
+        const feedbackText = document.getElementById('feedbackText');
+
+        function switchScreen(screenId) {
+            screens.forEach(s => s.classList.remove('active'));
+            document.getElementById(screenId).classList.add('active');
+        }
+
+        function applyTeamTheme() {
+            if(currentTeam === 0) {
+                root.style.setProperty('--active-color', 'var(--alpha-main)');
+                root.style.setProperty('--active-dark', 'var(--alpha-dark)');
+                root.style.setProperty('--active-glow', 'var(--alpha-glow)');
+                mainContainer.className = 'container glow-alpha';
+                scoreBoxes[0].classList.add('active-turn');
+                scoreBoxes[1].classList.remove('active-turn');
+            } else {
+                root.style.setProperty('--active-color', 'var(--bravo-main)');
+                root.style.setProperty('--active-dark', 'var(--bravo-dark)');
+                root.style.setProperty('--active-glow', 'var(--bravo-glow)');
+                mainContainer.className = 'container glow-bravo';
+                scoreBoxes[1].classList.add('active-turn');
+                scoreBoxes[0].classList.remove('active-turn');
+            }
+        }
+
+        function startMatch() {
+            scores = [0, 0];
+            currentTeam = 0;
+            currentQuestionIndex = 0;
+            currentRound = 1;
+            updateScoreboard();
+            showTurnAnnouncer();
+        }
+
+        function showTurnAnnouncer() {
+            switchScreen('quizScreen'); // Keep in background
+            applyTeamTheme();
+            
+            turnIcon.innerText = currentTeam === 0 ? '🔵' : '🔴';
+            turnTitleText.innerText = currentTeam === 0 ? 'GILIRAN TIM ALPHA' : 'GILIRAN TIM BRAVO';
+            turnTitleText.style.color = currentTeam === 0 ? 'var(--alpha-main)' : 'var(--bravo-main)';
+            
+            turnAnnouncer.classList.add('show');
+        }
+
+        function openBerkas() {
+            turnAnnouncer.classList.remove('show');
+            renderQuestion();
+        }
+
+        function shuffleArray(array) {
+            let cur = array.length, temp, rand;
+            while (0 !== cur) {
+                rand = Math.floor(Math.random() * cur);
+                cur -= 1;
+                temp = array[cur]; array[cur] = array[rand]; array[rand] = temp;
+            }
+            return array;
+        }
+
+        function renderQuestion() {
+            const q = questions[currentQuestionIndex];
+            badgeNumber.innerText = currentQuestionIndex + 1;
+            roundCounter.innerText = currentRound;
+            questionTypeLabel.innerText = q.label;
+            questionText.innerHTML = q.text;
+            
+            inputArea.innerHTML = '';
+            submitBtn.style.display = 'none'; 
+            submitBtn.onclick = null; 
+            
+            if (q.type === "multiple_choice") renderMC(q);
+            else if (q.type === "short_answer") renderSA(q);
+            else if (q.type === "ordering") renderOrdering(q);
+        }
+
+        function renderMC(q) {
+            const labels = ['A', 'B', 'C', 'D'];
+            q.options.forEach((opt, index) => {
+                const btn = document.createElement('button');
+                btn.className = 'option-btn';
+                btn.innerHTML = `<span class="option-letter">${labels[index]}</span> <span>${opt.text}</span>`;
+                btn.onclick = () => showFeedback(opt.isCorrect, q.explanation);
+                inputArea.appendChild(btn);
+            });
+        }
+
+        function renderSA(q) {
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.className = 'short-answer-input';
+            input.placeholder = 'Ketik jawaban rahasia di sini...';
+            
+            input.addEventListener("keypress", (e) => {
+                if (e.key === "Enter") { e.preventDefault(); submitBtn.click(); }
+            });
+
+            inputArea.appendChild(input);
+            submitBtn.style.display = 'block';
+            submitBtn.onclick = () => {
+                const val = input.value.trim().toLowerCase();
+                showFeedback(q.acceptableAnswers.includes(val), q.explanation);
+            };
+            setTimeout(() => input.focus(), 100);
+        }
+
+        function renderOrdering(q) {
+            currentOrderData = shuffleArray([...q.items]);
+            drawOrderList();
+            submitBtn.style.display = 'block';
+            submitBtn.onclick = () => {
+                let isCorrect = true;
+                for(let i=0; i < currentOrderData.length; i++) {
+                    if(currentOrderData[i] !== q.correctOrder[i]) { isCorrect = false; break; }
+                }
+                
+                let trueOrderList = "<ol style='text-align:left; margin-top:10px; margin-left: 20px; font-size: 0.95rem;'>";
+                q.correctOrder.forEach(i => { trueOrderList += `<li>${i}</li>`; });
+                trueOrderList += "</ol>";
+                
+                showFeedback(isCorrect, q.explanation + "<br><br><b>Urutan yang Benar:</b>" + trueOrderList);
+            };
+        }
+
+        function drawOrderList() {
+            inputArea.innerHTML = '';
+            currentOrderData.forEach((itemText, index) => {
+                const div = document.createElement('div');
+                div.className = 'order-item';
+                
+                const span = document.createElement('span');
+                span.innerText = itemText;
+                
+                const ctrls = document.createElement('div');
+                ctrls.className = 'order-controls';
+                
+                const btnUp = document.createElement('button');
+                btnUp.className = 'order-btn'; btnUp.innerHTML = '↑'; btnUp.disabled = (index === 0);
+                btnUp.onclick = () => moveItem(index, -1);
+                
+                const btnDown = document.createElement('button');
+                btnDown.className = 'order-btn'; btnDown.innerHTML = '↓'; btnDown.disabled = (index === currentOrderData.length - 1);
+                btnDown.onclick = () => moveItem(index, 1);
+                
+                ctrls.appendChild(btnUp); ctrls.appendChild(btnDown);
+                div.appendChild(span); div.appendChild(ctrls);
+                inputArea.appendChild(div);
+            });
+        }
+
+        function moveItem(index, dir) {
+            const tgt = index + dir;
+            if (tgt >= 0 && tgt < currentOrderData.length) {
+                const temp = currentOrderData[index];
+                currentOrderData[index] = currentOrderData[tgt];
+                currentOrderData[tgt] = temp;
+                drawOrderList(); 
+            }
+        }
+
+        function showFeedback(isCorrect, explanation) {
+            if (isCorrect) {
+                scores[currentTeam] += 10;
+                updateScoreboard(currentTeam);
+                feedbackIcon.innerText = '✅';
+                feedbackTitle.innerText = 'Analisis Akurat! (+10 Poin)';
+                feedbackTitle.style.color = 'var(--correct)';
+            } else {
+                feedbackIcon.innerText = '🚨';
+                feedbackTitle.innerText = 'Analisis Melenceng! (0 Poin)';
+                feedbackTitle.style.color = 'var(--incorrect)';
+            }
+            
+            feedbackText.innerHTML = `<strong>Fakta Intelijen:</strong><br><br>${explanation}`;
+            feedbackOverlay.classList.add('show');
+        }
+
+        function updateScoreboard(animateTeamIndex = -1) {
+            scoreTexts[0].innerText = scores[0];
+            scoreTexts[1].innerText = scores[1];
+
+            // Animate Pop if requested
+            if(animateTeamIndex !== -1) {
+                const el = scoreTexts[animateTeamIndex];
+                el.classList.add('pop');
+                setTimeout(() => el.classList.remove('pop'), 400);
+            }
+        }
+
+        function nextTurn() {
+            feedbackOverlay.classList.remove('show');
+            currentQuestionIndex++;
+            
+            if (currentQuestionIndex < questions.length) {
+                // Switch Team
+                currentTeam = currentTeam === 0 ? 1 : 0;
+                
+                // Increase round if it's Alpha's turn again
+                if (currentTeam === 0) currentRound++;
+                
+                showTurnAnnouncer();
+            } else {
+                showFinalResults();
+            }
+        }
+
+        function showFinalResults() {
+            switchScreen('resultScreen');
+            mainContainer.className = 'container'; // reset border
+            
+            document.getElementById('fsAlpha').innerText = scores[0];
+            document.getElementById('fsBravo').innerText = scores[1];
+            
+            const winnerText = document.getElementById('winnerText');
+            const winnerDesc = document.getElementById('winnerDesc');
+            const winnerTrophy = document.getElementById('winnerTrophy');
+
+            if (scores[0] > scores[1]) {
+                winnerText.innerText = "TIM ALPHA MENANG!";
+                winnerText.style.color = "var(--alpha-main)";
+                winnerDesc.innerText = "Tim Alpha membuktikan kapasitas analisis geopolitik dan tata negara yang lebih tajam!";
+            } else if (scores[1] > scores[0]) {
+                winnerText.innerText = "TIM BRAVO MENANG!";
+                winnerText.style.color = "var(--bravo-main)";
+                winnerDesc.innerText = "Tim Bravo mendominasi misi dengan literasi baca dan logika hukum yang luar biasa!";
+            } else {
+                winnerText.innerText = "HASIL SERI!";
+                winnerText.style.color = "#fdcb6e";
+                winnerTrophy.innerText = "🤝";
+                winnerDesc.innerText = "Kedua tim memiliki insting intelijen yang setara. Kalian berdua adalah aset berharga NKRI!";
+            }
+        }
+    </script>
+</body>
+</html>
